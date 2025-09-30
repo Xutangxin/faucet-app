@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ethers } from "ethers";
 import FaucetABI from "./abi/Faucet.json";
 import { FAUCET_ADDRESS, TOKEN_ADDRESS } from "./config";
@@ -34,18 +34,21 @@ function App() {
       const signer = await provider.getSigner();
       const faucet = new ethers.Contract(FAUCET_ADDRESS, FaucetABI.abi, signer);
 
+      const claimed = await faucet.hasClaimed(signer.getAddress());
+      if (claimed) {
+        alert("已领取过！");
+        return;
+      }
+
       setStatus("交易中...");
       const tx = await faucet.requestTokens();
       await tx.wait();
       setStatus("领取成功！");
     } catch (error) {
+      setStatus("");
       console.error("error: ", error);
     }
   };
-
-  useEffect(() => {
-    console.log("account: ", account);
-  }, [account]);
 
   return (
     <div style={{ textAlign: "center", marginTop: 50 }}>

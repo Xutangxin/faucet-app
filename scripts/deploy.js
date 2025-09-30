@@ -5,7 +5,6 @@ async function main() {
 
   const MyToken = await hre.ethers.getContractFactory("MyToken");
   const token = await MyToken.deploy(hre.ethers.parseUnits("1000000", 18));
-  // console.log("token: ", token);
   await token.waitForDeployment();
   console.log("MyToken deployed to:", token.target);
 
