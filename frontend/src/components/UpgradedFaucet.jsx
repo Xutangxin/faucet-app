@@ -7,7 +7,7 @@ import { LinkOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
-export default function Faucet() {
+export default function UpgradedFaucet() {
   const [account, setAccount] = useState("");
   const [balance, setBalance] = useState("");
   const [balanceLoading, setBalanceLoading] = useState("");
