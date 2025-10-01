@@ -3,6 +3,8 @@ import { ethers } from "ethers";
 import FaucetABI from "../abi/Faucet.json";
 import { balanceAbi, FAUCET_ADDRESS, TOKEN_ADDRESS } from "../config";
 import { Button, Card, notification, Typography, Spin } from "antd";
+import { LinkOutlined } from "@ant-design/icons";
+
 const { Text } = Typography;
 
 export default function Faucet() {
@@ -14,28 +16,32 @@ export default function Faucet() {
   const [api, contextHolder] = notification.useNotification();
 
   const connectWallet = async () => {
+    if (account) return;
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();
-      setAccount(await signer.getAddress());
-
-      const contract = new ethers.Contract(TOKEN_ADDRESS, balanceAbi, signer);
-
-      setBalanceLoading(true);
-      const balance = await contract.balanceOf(signer.getAddress());
-      const dec = await contract.decimals();
-      // const sym = await contract.symbol();
-      const sym = "MTK";
-      setBalanceLoading(false);
-
-      setBalance(ethers.formatUnits(balance, dec) + ` ${sym}`);
+      const addr = await signer.getAddress();
+      setAccount(addr);
+      getBalance(signer);
     } catch (error) {
+      console.error("error: ", error);
       api.error({
         message: "连接失败",
         description: error.message,
       });
     }
+  };
+
+  const getBalance = async (signer) => {
+    const contract = new ethers.Contract(TOKEN_ADDRESS, balanceAbi, signer);
+    setBalanceLoading(true);
+    const balance = await contract.balanceOf(signer.getAddress());
+    const dec = await contract.decimals();
+    // const sym = await contract.symbol();
+    const sym = "MTK";
+    setBalanceLoading(false);
+    setBalance(ethers.formatUnits(balance, dec) + ` ${sym}`);
   };
 
   const requestTokens = async () => {
@@ -45,20 +51,39 @@ export default function Faucet() {
       const signer = await provider.getSigner();
       const faucet = new ethers.Contract(FAUCET_ADDRESS, FaucetABI.abi, signer);
 
-      const claimed = await faucet.hasClaimed(signer.getAddress());
-      if (claimed) {
+      const left = await faucet.remainingClaims(signer.address);
+      const canClaim = parseInt(left.toString()) > 0;
+      if (!canClaim) {
         api.error({
           message: "操作失败",
-          description: "已领取过！",
+          description: "暂时还不能领取",
         });
         setTxLoading(false);
         return;
       }
 
       const tx = await faucet.requestTokens();
+      api.success({
+        message: "交易中",
+        description: (
+          <Button
+            type="link"
+            icon={<LinkOutlined />}
+            href={`https://sepolia.etherscan.io/tx/${tx.hash}`}
+            target="_blank"
+          >
+            在 Etherscan 上查看
+          </Button>
+        ),
+      });
       await tx.wait();
+      api.success({
+        message: "交易完成",
+      });
       setTxLoading(false);
+      getBalance(signer);
     } catch (error) {
+      console.error("error: ", error);
       setTxLoading(false);
       api.error({
         message: "操作失败",
@@ -71,8 +96,8 @@ export default function Faucet() {
     <>
       {contextHolder}
       <Card title="Sepolia 代币水龙头">
-        <Button type="primary" onClick={connectWallet}>
-          🦊 连接钱包
+        <Button type="primary" onClick={connectWallet} icon={<LinkOutlined />}>
+          连接钱包
         </Button>
 
         <div className="my-[16px]">
