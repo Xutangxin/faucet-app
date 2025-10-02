@@ -109,9 +109,7 @@ export default function UpgradedFaucet() {
 
   const getTokens = () => {
     getRemains();
-    const val = parseInt((remains || 0).toString());
-    console.log("remains count: ", val);
-    if (!val) {
+    if (remains === 0n) {
       api.error({
         message: "操作失败",
         description: "暂时还不能领取",
