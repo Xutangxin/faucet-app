@@ -47,7 +47,10 @@ export default function UpgradedFaucet() {
 
   // 获取余额
   const {
-    data: [{ result: bal }, { result: symbol }] = [{}, {}],
+    data: [{ result: bal }, { result: symbol }] = [
+      { result: 0n },
+      { result: "MTK" },
+    ],
     refetch: getBalance,
     isPending: balanceLoading,
   } = useReadContracts({
