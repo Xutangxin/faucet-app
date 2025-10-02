@@ -26,7 +26,7 @@ export default function UpgradedFaucet() {
   const { address, isConnected } = useAccount();
 
   const {
-    writeContract,
+    writeContract, // 领取token
     data: hash,
     isPending: sendLoading,
     error: txError,
@@ -36,6 +36,7 @@ export default function UpgradedFaucet() {
   });
   const tokenLoading = sendLoading || txLoading;
 
+  // 获取剩余领取数
   const { data: remains, refetch: getRemains } = useReadContract({
     abi: FaucetABI.abi,
     address: FAUCET_ADDRESS,
@@ -44,6 +45,7 @@ export default function UpgradedFaucet() {
     enabled: false,
   });
 
+  // 获取余额
   const {
     data: [{ result: bal }, { result: symbol }] = [{}, {}],
     refetch: getBalance,
@@ -105,9 +107,9 @@ export default function UpgradedFaucet() {
     });
   }, [hash]);
 
-  const requestTokens = () => {
+  const getTokens = () => {
     getRemains();
-    const val = parseInt(remains.toString());
+    const val = parseInt((remains || 0).toString());
     console.log("remains count: ", val);
     if (!val) {
       api.error({
@@ -161,7 +163,7 @@ export default function UpgradedFaucet() {
         </div>
         <Button
           disabled={!isConnected}
-          onClick={requestTokens}
+          onClick={getTokens}
           loading={tokenLoading}
         >
           {tokenLoading ? "交易中" : "领取代币"}
