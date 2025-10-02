@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ethers } from "ethers";
 import FaucetABI from "../abi/Faucet.json";
-import { balanceAbi, FAUCET_ADDRESS, TOKEN_ADDRESS } from "../config";
+import { tokenAbi, FAUCET_ADDRESS, TOKEN_ADDRESS } from "../config";
 import { Button, Card, notification, Typography } from "antd";
 import { LinkOutlined } from "@ant-design/icons";
 
@@ -34,7 +34,7 @@ export default function Faucet() {
   };
 
   const getBalance = async (signer) => {
-    const contract = new ethers.Contract(TOKEN_ADDRESS, balanceAbi, signer);
+    const contract = new ethers.Contract(TOKEN_ADDRESS, tokenAbi, signer);
     setBalanceLoading(true);
     const balance = await contract.balanceOf(signer.getAddress());
     const dec = await contract.decimals();
