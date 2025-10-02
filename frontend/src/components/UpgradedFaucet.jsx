@@ -10,6 +10,9 @@ import {
   useDisconnect,
   injected,
   useReadContracts,
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
 } from "wagmi";
 import { formatUnits } from "viem";
 
@@ -18,12 +21,32 @@ const { Text } = Typography;
 export default function UpgradedFaucet() {
   const [api, contextHolder] = notification.useNotification();
 
-  const { address, isConnected } = useAccount();
   const { connect, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
+  const { address, isConnected } = useAccount();
+
+  const {
+    writeContract,
+    data: hash,
+    isPending: sendLoading,
+    error: txError,
+  } = useWriteContract();
+  const { isSuccess, isLoading: txLoading } = useWaitForTransactionReceipt({
+    hash,
+  });
+  const tokenLoading = sendLoading || txLoading;
+
+  const { data: remains, refetch: getRemains } = useReadContract({
+    abi: FaucetABI.abi,
+    address: FAUCET_ADDRESS,
+    functionName: "remainingClaims",
+    args: [address],
+    enabled: false,
+  });
 
   const {
     data: [{ result: bal }, { result: symbol }] = [{}, {}],
+    refetch: getBalance,
     isPending: balanceLoading,
   } = useReadContracts({
     contracts: [
@@ -42,61 +65,63 @@ export default function UpgradedFaucet() {
   });
 
   useEffect(() => {
-    if (connectError) {
-      api.error({
-        message: "连接失败",
-        description: connectError.message,
-      });
-    }
+    if (!connectError) return;
+    api.error({
+      message: "连接失败",
+      description: connectError.message,
+    });
   }, [connectError]);
 
-  // const requestTokens = async () => {
-  //   try {
-  //     setTxLoading(true);
-  //     const provider = new ethers.BrowserProvider(window.ethereum);
-  //     const signer = await provider.getSigner();
-  //     const faucet = new ethers.Contract(FAUCET_ADDRESS, FaucetABI.abi, signer);
+  useEffect(() => {
+    if (!txError) return;
+    api.error({
+      message: "操作失败",
+      description: txError.message,
+    });
+  }, [txError]);
 
-  //     const left = await faucet.remainingClaims(signer.address);
-  //     const canClaim = parseInt(left.toString()) > 0;
-  //     if (!canClaim) {
-  //       api.error({
-  //         message: "操作失败",
-  //         description: "暂时还不能领取",
-  //       });
-  //       setTxLoading(false);
-  //       return;
-  //     }
+  useEffect(() => {
+    if (!isSuccess) return;
+    api.success({
+      message: "交易完成",
+    });
+    getBalance();
+  }, [isSuccess]);
 
-  //     const tx = await faucet.requestTokens();
-  //     api.success({
-  //       message: "交易中",
-  //       description: (
-  //         <Button
-  //           type="link"
-  //           icon={<LinkOutlined />}
-  //           href={`https://sepolia.etherscan.io/tx/${tx.hash}`}
-  //           target="_blank"
-  //         >
-  //           在 Etherscan 上查看
-  //         </Button>
-  //       ),
-  //     });
-  //     await tx.wait();
-  //     api.success({
-  //       message: "交易完成",
-  //     });
-  //     setTxLoading(false);
-  //     getBalance(signer);
-  //   } catch (error) {
-  //     console.error("error: ", error);
-  //     setTxLoading(false);
-  //     api.error({
-  //       message: "操作失败",
-  //       description: error.message,
-  //     });
-  //   }
-  // };
+  useEffect(() => {
+    if (!hash) return;
+    api.success({
+      message: "交易中",
+      description: (
+        <Button
+          type="link"
+          icon={<LinkOutlined />}
+          href={`https://sepolia.etherscan.io/tx/${hash}`}
+          target="_blank"
+        >
+          在 Etherscan 上查看
+        </Button>
+      ),
+    });
+  }, [hash]);
+
+  const requestTokens = () => {
+    getRemains();
+    const val = parseInt(remains.toString());
+    console.log("remains count: ", val);
+    if (!val) {
+      api.error({
+        message: "操作失败",
+        description: "暂时还不能领取",
+      });
+      return;
+    }
+    writeContract({
+      abi: FaucetABI.abi,
+      address: FAUCET_ADDRESS,
+      functionName: "requestTokens",
+    });
+  };
 
   return (
     <>
@@ -127,11 +152,19 @@ export default function UpgradedFaucet() {
           </p>
           <p>
             余额：
-            {balanceLoading ? "加载中..." : `${formatUnits(bal, 18)} ${symbol}`}
+            {isConnected
+              ? balanceLoading
+                ? "加载中..."
+                : `${formatUnits(bal, 18)} ${symbol}`
+              : "--"}
           </p>
         </div>
-        <Button disabled={!isConnected} loading={false}>
-          {isConnected ? "交易中" : "领取代币"}
+        <Button
+          disabled={!isConnected}
+          onClick={requestTokens}
+          loading={tokenLoading}
+        >
+          {tokenLoading ? "交易中" : "领取代币"}
         </Button>
       </Card>
     </>
