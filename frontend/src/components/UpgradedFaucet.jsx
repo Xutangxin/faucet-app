@@ -1,22 +1,9 @@
 import { useEffect } from "react";
-import FaucetABI from "../abi/Faucet.json";
-import { tokenAbi, FAUCET_ADDRESS, TOKEN_ADDRESS } from "../config";
-import { Button, Card, notification, Typography } from "antd";
+import { Button, Card, notification } from "antd";
 import { LinkOutlined } from "@ant-design/icons";
-
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  injected,
-  useReadContracts,
-  useReadContract,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
-import { formatUnits } from "viem";
-
-const { Text } = Typography;
+import { useAccount, useConnect, useDisconnect, injected } from "wagmi";
+import useFaucet from "../hooks/useFaucet";
+import AccountInfo from "./AccountInfo";
 
 export default function UpgradedFaucet() {
   const [api, contextHolder] = notification.useNotification();
@@ -25,49 +12,8 @@ export default function UpgradedFaucet() {
   const { disconnect } = useDisconnect();
   const { address, isConnected } = useAccount();
 
-  const {
-    writeContract, // 领取token
-    data: hash,
-    isPending: sendLoading,
-    error: txError,
-  } = useWriteContract();
-  const { isSuccess, isLoading: txLoading } = useWaitForTransactionReceipt({
-    hash,
-  });
-  const tokenLoading = sendLoading || txLoading;
-
-  // 获取剩余领取数
-  const { data: remains, refetch: getRemains } = useReadContract({
-    abi: FaucetABI.abi,
-    address: FAUCET_ADDRESS,
-    functionName: "remainingClaims",
-    args: [address],
-    enabled: false,
-  });
-
-  // 获取余额
-  const {
-    data: [{ result: bal }, { result: symbol }] = [
-      { result: 0n },
-      { result: "MTK" },
-    ],
-    refetch: getBalance,
-    isPending: balanceLoading,
-  } = useReadContracts({
-    contracts: [
-      {
-        address: TOKEN_ADDRESS,
-        abi: tokenAbi,
-        functionName: "balanceOf",
-        args: [address],
-      },
-      {
-        address: TOKEN_ADDRESS,
-        abi: tokenAbi,
-        functionName: "symbol",
-      },
-    ],
-  });
+  const { balance, remains, loading, writeError, hash, isSuccess, claim } =
+    useFaucet();
 
   useEffect(() => {
     if (!connectError) return;
@@ -78,19 +24,18 @@ export default function UpgradedFaucet() {
   }, [connectError]);
 
   useEffect(() => {
-    if (!txError) return;
+    if (!writeError) return;
     api.error({
       message: "操作失败",
-      description: txError.message,
+      description: writeError.message,
     });
-  }, [txError]);
+  }, [writeError]);
 
   useEffect(() => {
     if (!isSuccess) return;
     api.success({
       message: "交易完成",
     });
-    getBalance();
   }, [isSuccess]);
 
   useEffect(() => {
@@ -109,22 +54,6 @@ export default function UpgradedFaucet() {
       ),
     });
   }, [hash]);
-
-  const getTokens = () => {
-    getRemains();
-    if (remains === 0n) {
-      api.error({
-        message: "操作失败",
-        description: "暂时还不能领取",
-      });
-      return;
-    }
-    writeContract({
-      abi: FaucetABI.abi,
-      address: FAUCET_ADDRESS,
-      functionName: "requestTokens",
-    });
-  };
 
   return (
     <>
@@ -148,26 +77,14 @@ export default function UpgradedFaucet() {
           )}
         </div>
 
-        <div className="my-[16px]">
-          <p>
-            账户：
-            <Text copyable={address}>{address || "--"}</Text>
-          </p>
-          <p>
-            余额：
-            {isConnected
-              ? balanceLoading
-                ? "加载中..."
-                : `${formatUnits(bal, 18)} ${symbol}`
-              : "--"}
-          </p>
-        </div>
+        <AccountInfo address={address} balance={balance} />
+
         <Button
-          disabled={!isConnected}
-          onClick={getTokens}
-          loading={tokenLoading}
+          disabled={!isConnected || remains === 0n}
+          onClick={claim}
+          loading={loading}
         >
-          {tokenLoading ? "交易中" : "领取代币"}
+          {loading ? "交易中" : "领取代币"}
         </Button>
       </Card>
     </>
