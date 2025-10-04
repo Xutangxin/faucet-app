@@ -1,6 +1,6 @@
 # faucet app (hardhat + react + wagmi)
 
-### 步驟
+### 步骤：
 
 1. npm install & cd frontend npm install（hardhat 依赖 & 前端依赖）
 2. 部署合约 npx hardhat run scripts/deploy.js --network sepolia
